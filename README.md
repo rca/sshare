@@ -1,11 +1,25 @@
 # sshare - Securely share files with RSA keys
 
-This is a script that uses RSA keys to encrypt and decrypt a data file.  Note, this script exists to solve a chicken-and-egg problem; like when you need to transfer secrets over the public Internet and all you have is openssl.  In other words, if you can use PGP, SSH, SFTP, etc. those are much better, use those alternatives instead.
+This is a script that uses RSA keys to encrypt and decrypt a data file.  Note, this script exists to solve a chicken-and-egg problem; like when you need to transfer secrets over the public Internet and all you have is OpenSSL.  In other words, if you can use PGP, SSH, SFTP, etc. those are much better, use them instead.
 
 
-## Note on LibreSSL
+## Note on OpenSSL versions and LibreSSL
 
-This script is not compatible with LibreSSL.  If you have alternative versions of OpenSSL, for example installed with homebrew on MacOS, point to it using the `SSHARE_OPENSSL` environment variable:
+This script is confirmed to work with OpenSSL version 1.1.x.  On Ubuntu 18.04 LTS:
+
+```
+$ openssl version
+OpenSSL 1.1.1  11 Sep 2018
+```
+
+And MacOS with Homebrew:
+
+```
+$ /usr/local/opt/openssl@1.1/bin/openssl version
+OpenSSL 1.1.1d  10 Sep 2019
+```
+
+This script _is not compatible_ with LibreSSL.  If you have alternative versions of OpenSSL, for example installed with Homebrew on MacOS, point to it using the `SSHARE_OPENSSL` environment variable:
 
 ```
 $ export SSHARE_OPENSSL=/usr/local/opt/openssl@1.1/bin/openssl
