@@ -1,0 +1,178 @@
+#!/bin/bash
+set -e  # exit on first error
+set -o noclobber  # try to not clobber existing files
+
+SCRIPT_NAME=$(basename $0)
+SSHARE_ROOT=${HOME}/.sshare
+
+SSHARE_KEY_PATH=${SSHARE_ROOT}/sshare.key
+SSHARE_PUB_KEY_PATH=${SSHARE_ROOT}/sshare.pub
+
+SYMMETRIC_KEY_NAME=secret.key
+ENCRYPTED_SYMMETRIC_KEY_NAME=${SYMMETRIC_KEY_NAME}.enc
+
+OPENSSL=${SSHARE_OPENSSL:-openssl}
+
+
+openssl_version=$(${OPENSSL} version)
+echo ${openssl_version} | grep -iq "libressl" && is_libressl=1 || is_libressl=0
+
+if [ "${is_libressl}" == 1 ]; then
+  echo "This script does not work with LibreSSL; please use openssl"
+  echo "You can set the OPENSSL environment variable to point to another \`openssl\` binary"
+
+  exit 1;
+fi;
+
+if [ -z $1 ]; then
+  echo "Error: no command given"
+  echo "${SCRIPT_NAME} (genkey|enc|dec) [filename]"
+
+  exit 1;
+fi;
+
+
+function dec ()
+{
+  if [ -z $2 ]; then
+    echo "Error: you must specify the private key and the file to decrypt"
+    echo "${SCRIPT_NAME} dec <private key> <file>"
+
+    return 1;
+  fi;
+
+  private_key=$1;
+  shift;
+
+  file=$1;
+  shift;
+
+  curr_dir=$(pwd)
+  tmpdir=.sshare-${RANDOM}
+  mkdir -p ${tmpdir}
+
+  cp ${file} ${tmpdir}
+  cd ${tmpdir}
+
+  tmpdir_file=$(basename ${file})
+
+  infile=$(tar tzf ${tmpdir_file} | grep -v 'key.enc$')
+  outfile=$(echo ${infile} | sed -e 's/.enc$//')
+
+  tar -xzvf ${tmpdir_file}
+
+  ${OPENSSL} rsautl -decrypt -inkey ${private_key} -in ${ENCRYPTED_SYMMETRIC_KEY_NAME} -out ${SYMMETRIC_KEY_NAME}
+  ${OPENSSL} enc -d -aes-256-cbc -pbkdf2 -in ${infile} -out ${outfile} -pass file:${SYMMETRIC_KEY_NAME}
+
+  mv ${outfile} ${curr_dir}
+
+  cd ${curr_dir}
+  rm -rf ${tmpdir}
+}
+
+
+function enc ()
+{
+  if [ -z $2 ]; then
+    echo "Error: you must specify the recipient's public key and the file to encrypt"
+    echo "${SCRIPT_NAME} enc <recipient pkcs8> <file>"
+
+    return 1;
+  fi;
+
+  recipient_pub_key=$1;
+  shift;
+
+  file=$1;
+  shift;
+
+  tmpdir=".sshare-${RANDOM}"
+  tmpdir_file=$(basename ${file})
+  curr_dir=$(pwd)
+
+  mkdir -p ${tmpdir}
+
+  cp ${file} ${tmpdir}
+  cp ${recipient_pub_key} ${tmpdir}
+
+  cd ${tmpdir}
+
+  if [ -e ${SYMMETRIC_KEY_NAME} ]; then
+    echo "Error: secret ${SYMMETRIC_KEY_NAME} exists, cannot continue.  Please remove or rename ${SYMMETRIC_KEY_NAME} and try again"
+    return 1
+  fi;
+
+  file_encrypted_name=${tmpdir_file}.enc
+
+  ${OPENSSL} rand -out ${SYMMETRIC_KEY_NAME} 192
+
+  ${OPENSSL} enc -aes-256-cbc -pbkdf2 -in ${tmpdir_file} -out ${file_encrypted_name} -pass file:${SYMMETRIC_KEY_NAME}
+  ${OPENSSL} rsautl -encrypt -pubin -inkey ${recipient_pub_key} -in ${SYMMETRIC_KEY_NAME} -out ${ENCRYPTED_SYMMETRIC_KEY_NAME}
+
+  outfile=${file}.sshare.tgz
+
+  tar -czvf ${outfile} ${ENCRYPTED_SYMMETRIC_KEY_NAME} ${file_encrypted_name}
+
+  mv ${outfile} ${curr_dir}
+
+  cd ${curr_dir}
+  rm -rf ${tmpdir}
+
+  echo "Send the recipient the file: " 1>&2
+  echo "${outfile}"
+}
+
+
+function genkey ()
+{
+
+  mkdir -p ${SSHARE_ROOT}
+  chmod 0700 ${SSHARE_ROOT}
+
+  if [ -e "${SSHARE_KEY_PATH}" ]; then
+    echo "${SSHARE_KEY_PATH} already exists"
+  else
+    ${OPENSSL} genrsa -out ${SSHARE_KEY_PATH} 4096
+  fi;
+
+  ${OPENSSL} rsa -in ${SSHARE_KEY_PATH} -pubout -out ${SSHARE_PUB_KEY_PATH}
+
+  echo -e "\nThe key ${SSHARE_KEY_PATH} has been created."
+  echo -e "\nCopy the key below and send to the person who wants to share with you:\n"
+
+  cat ${SSHARE_PUB_KEY_PATH}
+}
+
+
+command=$1;
+shift;
+
+case "${command}" in
+  dec)
+    dec "$@"
+    ;;
+  enc)
+    enc "$@"
+    ;;
+  genkey)
+    genkey
+    ;;
+  test)
+    outfile=$(enc "$@")
+    echo ${outfile}
+    pub=${1}
+    key=$(echo ${pub} | sed -e 's/pub/key/')
+
+    dec ${key} ${outfile}
+    ;;
+  *)
+    echo "Unknown command: ${command}"
+    exit 1;
+    ;;
+esac
+
+# tar xzf openslate-dev--marcus.ovpn.tgz
+#
+# ${OPENSSL} rsautl -decrypt -ssl -inkey ~/.ssh/id_rsa -in key.enc -out key
+#
+# ${OPENSSL} aes-256-cbc -d -in openslate-dev--marcus.ovpn.enc -out openslate-dev--marcus.ovpn -pass file:key
