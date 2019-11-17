@@ -68,6 +68,9 @@ function dec ()
 
   cd ${curr_dir}
   rm -rf ${tmpdir}
+
+  /bin/echo -n "file decrypted at: " 1>&2
+  echo "${outfile}"
 }
 
 
@@ -118,7 +121,7 @@ function enc ()
   cd ${curr_dir}
   rm -rf ${tmpdir}
 
-  echo "Send the recipient the file: " 1>&2
+  /bin/echo -n "Send the recipient the file: " 1>&2
   echo "${outfile}"
 }
 
