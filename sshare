@@ -140,6 +140,9 @@ function genkey ()
 
   ${OPENSSL} rsa -in ${SSHARE_KEY_PATH} -pubout -out ${SSHARE_PUB_KEY_PATH}
 
+  # lock down the key
+  chmod 0600 ${SSHARE_KEY_PATH}
+
   echo -e "\nThe key ${SSHARE_KEY_PATH} has been created."
   echo -e "\nCopy the key below and send to the person who wants to share with you:\n"
 
