@@ -26,14 +26,7 @@ fi;
 openssl_cipher="-aes-256-cbc"
 openssl_pbkdf2="-pbkdf2"
 ${OPENSSL} enc -help 2>&1 | grep -q -- ${openssl_pbkdf2} && support_pbkdf2=1 || support_pbkdf2=0
-# how to reliably fallback to AES if pbkdf2 isn't available?
-# if [ "${support_pbkdf2}" == "1" ]; then
-#   cipher="${openssl_pbkdf2}"
-# else
-#   echo "Warning: ${openssl_pbkdf2} not found in openssl options; using ${openssl_cipher}"
-#
-#   cipher="${openssl_cipher}"
-# fi;
+
 cipher="${openssl_cipher}"
 
 if [ -z $1 ]; then
@@ -102,6 +95,12 @@ function enc ()
   file=$1;
   shift;
 
+  # check to see if there's a pbkdf2 flag in the public key payload
+  cat ${recipient_pub_key} | grep -q "support_pbkdf2=1" && recipient_support_pbkdf2=1 || recipient_support_pbkdf2=0
+  if [ "${recipient_support_pbkdf2}" == "1" ]; then
+    cipher=${openssl_pbkdf2}
+  fi;
+
   tmpdir=".sshare-${RANDOM}"
   tmpdir_file=$(basename ${file})
   curr_dir=$(pwd)
@@ -159,6 +158,7 @@ function genkey ()
   echo -e "\nThe key ${SSHARE_KEY_PATH} has been created."
   echo -e "\nCopy the key below and send to the person who wants to share with you:\n"
 
+  echo "support_pbkdf2=${support_pbkdf2}"
   cat ${SSHARE_PUB_KEY_PATH}
 }
 
