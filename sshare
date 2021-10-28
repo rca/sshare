@@ -13,15 +13,6 @@ ENCRYPTED_SYMMETRIC_KEY_NAME=${SYMMETRIC_KEY_NAME}.enc
 
 OPENSSL=${SSHARE_OPENSSL:-openssl}
 
-openssl_version=$(${OPENSSL} version)
-echo ${openssl_version} | grep -iq "libressl" && is_libressl=1 || is_libressl=0
-
-if [ "${is_libressl}" == 1 ]; then
-  echo "This script does not work with LibreSSL; please use openssl"
-  echo "You can set the OPENSSL environment variable to point to another \`openssl\` binary"
-
-  exit 1;
-fi;
 
 openssl_cipher="-aes-256-cbc"
 openssl_pbkdf2="-pbkdf2"
